@@ -4,7 +4,7 @@ Add syntax tables to org src blocks according to their major mode.
 
 ** Installation
 
-*** Manual
+*** Manually
 
 Download repository and add it to your ~load-path~.
 
@@ -16,11 +16,15 @@ Download repository and add it to your ~load-path~.
 (add-hook 'org-mode-hook 'org-src-syntax-table-mode)
 #+end_src
 
-*** with straight-use-package
+*** With straight-use-package
 
 Put the following in your init file:
 
 #+begin_src elisp
 (use-package org-src-syntax-table
+  :straight (org-src-syntax-table
+             :type git
+             :host github
+             :repo "KarimAziev/org-src-syntax-table")
   :hook (org-mode . org-src-syntax-table-mode))
 #+end_src
