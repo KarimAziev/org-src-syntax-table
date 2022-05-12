@@ -1,0 +1,26 @@
+* org-src-syntax-table
+
+Add syntax tables to org src blocks according to their major mode.
+
+** Installation
+
+*** Manual
+
+Download repository and add it to your ~load-path~.
+
+#+begin_src elisp
+
+(add-to-list 'load-path "org-src-syntax-table")
+
+(require 'org-src-syntax-table)
+(add-hook 'org-mode-hook 'org-src-syntax-table-mode)
+#+end_src
+
+*** with straight-use-package
+
+Put the following in your init file:
+
+#+begin_src elisp
+(use-package org-src-syntax-table
+  :hook (org-mode . org-src-syntax-table-mode))
+#+end_src
