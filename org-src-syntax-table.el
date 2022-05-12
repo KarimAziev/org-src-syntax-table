@@ -6,7 +6,7 @@
 ;; URL: https://github.com/KarimAziev/ohai-emacs
 ;; Keywords: outlines
 ;; Version: 0.1.1
-;; Package-Requires: ((emacs "26.1"))
+;; Package-Requires: ((emacs "27.1"))
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -85,7 +85,6 @@ This function should be used added globally to a variable `org-font-lock-hook'."
   :global nil
   (if org-src-syntax-table-mode
       (progn
-        (message "mode on")
         (setq org-src-syntax-table-lookup-properties-orig
               parse-sexp-lookup-properties)
         (setq-local parse-sexp-lookup-properties t)
