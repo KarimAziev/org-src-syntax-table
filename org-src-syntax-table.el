@@ -3,7 +3,7 @@
 ;; Copyright (C) 2022 Karim Aziiev <karim.aziiev@gmail.com>
 
 ;; Author: Karim Aziiev <karim.aziiev@gmail.com>
-;; URL: https://github.com/KarimAziev/ohai-emacs
+;; URL: https://github.com/KarimAziev/org-src-syntax-table
 ;; Keywords: outlines
 ;; Version: 0.1.1
 ;; Package-Requires: ((emacs "27.1"))
@@ -88,8 +88,12 @@ This function should be used added globally to a variable `org-font-lock-hook'."
         (setq org-src-syntax-table-lookup-properties-orig
               parse-sexp-lookup-properties)
         (setq-local parse-sexp-lookup-properties t)
-        (add-hook 'org-font-lock-hook 'org-src-syntax-table-add-syntax-table))
-    (remove-hook 'org-font-lock-hook 'org-src-syntax-table-add-syntax-table)
+        (save-excursion
+          (goto-char (point-min))
+          (org-src-syntax-table-add-syntax-table nil))
+        (add-hook 'org-font-lock-hook
+                  'org-src-syntax-table-add-syntax-table nil t))
+    (remove-hook 'org-font-lock-hook 'org-src-syntax-table-add-syntax-table t)
     (setq-local parse-sexp-lookup-properties
                 org-src-syntax-table-lookup-properties-orig)))
 
