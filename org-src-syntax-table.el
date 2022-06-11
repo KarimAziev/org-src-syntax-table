@@ -49,34 +49,96 @@
 This function should be used added globally to a variable `org-font-lock-hook'."
   (let ((case-fold-search t))
     (if-let ((beg (when org-src-syntax-table-block-last-table
-                    (point))))
+                    (when (re-search-forward "." nil t 1)
+                      (forward-char -1)
+                      (point)))))
         (progn
           (if (null (re-search-forward "#\\+end_src" limit t 1))
               (org-src-syntax-table-propertize beg limit)
             (forward-line -1)
             (end-of-line)
-            (org-src-syntax-table-propertize beg (point))
+            (when (re-search-backward "." beg t 1)
+              (org-src-syntax-table-propertize beg (point)))
             (setq org-src-syntax-table-block-last-table nil)))
       (while (re-search-forward "#\\+begin_src[\s\t]+\\([a-z][^\s\t\n]+\\)"
                                 limit t 1)
         (let ((lang (match-string-no-properties 1)))
           (forward-line 1)
           (beginning-of-line 1)
-          (when-let ((mode (and
-                            (not (looking-at "#\\+end_src"))
-                            (org-src-get-lang-mode lang)))
-                     (beg (point)))
-            (when (fboundp mode)
-              (setq org-src-syntax-table-block-last-table
-                    (with-temp-buffer
-                      (delay-mode-hooks (funcall mode)
-                                        (syntax-table))))
-              (if (null (re-search-forward "#\\+end_src" limit t 1))
-                  (org-src-syntax-table-propertize beg limit)
-                (forward-line -1)
-                (end-of-line)
-                (org-src-syntax-table-propertize beg (point))
-                (setq org-src-syntax-table-block-last-table nil)))))))))
+          (when (re-search-forward "." limit t 1)
+            (forward-char -1)
+            (when-let ((mode (and
+                              (not (looking-at "#\\+end_src"))
+                              (org-src-get-lang-mode lang)))
+                       (beg (point)))
+              (when (fboundp mode)
+                (setq org-src-syntax-table-block-last-table
+                      (with-temp-buffer
+                        (delay-mode-hooks (funcall mode)
+                                          (syntax-table))))
+                (if (null (re-search-forward "#\\+end_src" limit t 1))
+                    (org-src-syntax-table-propertize beg limit)
+                  (forward-line -1)
+                  (end-of-line)
+                  (org-src-syntax-table-propertize beg (point))
+                  (setq org-src-syntax-table-block-last-table nil))))))))))
+
+(defun org-src-syntax-table-get-src-params ()
+  "If point is inside body of src block return list - (LANGUAGE BEGINNING END)."
+  (save-excursion
+    (let ((case-fold-search t))
+      (when (re-search-forward "#\\+\\(begin\\|end\\)_src\\($\\|[\s\f\t\n\r\v]\\)"
+                               nil t 1)
+        (when-let ((word (match-string-no-properties 1))
+                   (end (match-beginning 0)))
+          (when (or (string= word "end")
+                    (string= word "END"))
+            (when (re-search-backward
+                   "^\\([ \t]*\\)#\\+begin_src[ \t]+\\([^ \f\t\n\r\v]+\\)[ \t]*"
+                   nil t 1)
+              (let ((lang (match-string-no-properties 2)))
+                (forward-line 1)
+                (list lang (point) end)))))))))
+
+(defun org-src-syntax-table-pre-command-hook ()
+  "If point is inside body of src block return list - (LANGUAGE BEGINNING END)."
+  (if-let* ((params (and
+                     (memq this-command '(forward-sexp
+                                          backward-sexp
+                                          forward-list
+                                          backward-list))
+                     (org-src-syntax-table-get-src-params)))
+            (mode (and
+                   (car params)
+                   (org-src-get-lang-mode (car params))))
+            (table (with-temp-buffer
+                     (delay-mode-hooks (funcall mode)
+                                       (syntax-table)))))
+      (let ((inhibit-read-only t))
+        (add-text-properties (nth 1 params) (nth 2 params)
+                             `(syntax-table ,table))
+        (setq-local parse-sexp-lookup-properties t))
+    (setq-local parse-sexp-lookup-properties
+                org-src-syntax-table-lookup-properties-orig)))
+
+(defun org-src-syntax-table-region-property-boundaries (prop &optional pos)
+  "Return property boundaries for PROP at POS."
+  (unless pos (setq pos (point)))
+  (let (beg end val)
+    (setq val (get-text-property pos prop))
+    (if (null val)
+        val
+      (if (or (bobp)
+              (not (eq (get-text-property (1- pos) prop) val)))
+          (setq beg pos)
+        (setq beg (previous-single-property-change pos prop))
+        (when (null beg) (setq beg (point-min))))
+      (if (or (eobp)
+              (not (eq (get-text-property (1+ pos) prop) val)))
+          (setq end pos)
+        (setq end (next-single-property-change pos prop))
+        (when (null end) (setq end (point-min))))
+      (cons beg end))))
 
 ;;;###autoload
 (define-minor-mode org-src-syntax-table-mode
@@ -84,16 +146,11 @@ This function should be used added globally to a variable `org-font-lock-hook'."
   :lighter " km-org"
   :global nil
   (if org-src-syntax-table-mode
-      (progn
-        (setq org-src-syntax-table-lookup-properties-orig
-              parse-sexp-lookup-properties)
-        (setq-local parse-sexp-lookup-properties t)
-        (save-excursion
-          (goto-char (point-min))
-          (org-src-syntax-table-add-syntax-table nil))
-        (add-hook 'org-font-lock-hook
-                  'org-src-syntax-table-add-syntax-table nil t))
-    (remove-hook 'org-font-lock-hook 'org-src-syntax-table-add-syntax-table t)
+      (progn (setq org-src-syntax-table-lookup-properties-orig
+                   parse-sexp-lookup-properties)
+             (add-hook 'pre-command-hook
+                       'org-src-syntax-table-pre-command-hook nil t))
+    (remove-hook 'pre-command-hook 'org-src-syntax-table-pre-command-hook t)
     (setq-local parse-sexp-lookup-properties
                 org-src-syntax-table-lookup-properties-orig)))
 
