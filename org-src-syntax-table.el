@@ -143,7 +143,7 @@ This function should be used added globally to a variable `org-font-lock-hook'."
 ;;;###autoload
 (define-minor-mode org-src-syntax-table-mode
   "Propertize org src blocks with syntax tables from their major-mode."
-  :lighter " km-org"
+  :lighter " stx-tbl"
   :global nil
   (if org-src-syntax-table-mode
       (progn (setq org-src-syntax-table-lookup-properties-orig
