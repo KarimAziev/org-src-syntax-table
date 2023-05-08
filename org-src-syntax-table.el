@@ -32,10 +32,20 @@
 
 ;;; Code:
 
-(require 'org)
-
 (defvar-local org-src-syntax-table-block-last-table nil)
-(defvar-local org-src-syntax-table-lookup-properties-orig nil)
+(defvar-local org-src-syntax-table-properties-orig nil)
+(defvar-local org-src-syntax-table-paren-function-orig nil)
+
+(defcustom org-src-syntax-table-commands '(forward-sexp
+                                           backward-sexp
+                                           backward-up-list
+                                           forward-list
+                                           backward-list)
+  "List of allowed commands to propertize src blocks."
+  :group 'org-src-syntax-table
+  :type '(repeat  (function :tag "Command")))
+
+(declare-function org-src-get-lang-mode "org")
 
 (defun org-src-syntax-table-propertize (beg end)
   "Propertize region from BEG to END with `syntax-table'."
@@ -45,13 +55,14 @@
                            ,org-src-syntax-table-block-last-table))))
 
 (defun org-src-syntax-table-add-syntax-table (limit)
-  "Propertize src blocks from point to LIMIT with syntax table according to mode.
+  "Propertize src blocks from point to LIMIT with according syntax table.
 This function should be used added globally to a variable `org-font-lock-hook'."
   (let ((case-fold-search t))
-    (if-let ((beg (when org-src-syntax-table-block-last-table
-                    (when (re-search-forward "." nil t 1)
-                      (forward-char -1)
-                      (point)))))
+    (if-let ((beg
+              (when org-src-syntax-table-block-last-table
+                (when (re-search-forward "." nil t 1)
+                  (forward-char -1)
+                  (point)))))
         (progn
           (if (null (re-search-forward "#\\+end_src" limit t 1))
               (org-src-syntax-table-propertize beg limit)
@@ -100,14 +111,9 @@ This function should be used added globally to a variable `org-font-lock-hook'."
                 (forward-line 1)
                 (list lang (point) end)))))))))
 
-(defun org-src-syntax-table-pre-command-hook ()
-  "If point is inside body of src block return list - (LANGUAGE BEGINNING END)."
-  (if-let* ((params (and
-                     (memq this-command '(forward-sexp
-                                          backward-sexp
-                                          forward-list
-                                          backward-list))
-                     (org-src-syntax-table-get-src-params)))
+(defun org-src-syntax-table-propertize-src-block ()
+  "Add syntax table to current src block according to their major mode."
+  (if-let* ((params (org-src-syntax-table-get-src-params))
             (mode (and
                    (car params)
                    (org-src-get-lang-mode (car params))))
@@ -115,11 +121,18 @@ This function should be used added globally to a variable `org-font-lock-hook'."
                      (delay-mode-hooks (funcall mode)
                                        (syntax-table)))))
       (let ((inhibit-read-only t))
-        (add-text-properties (nth 1 params) (nth 2 params)
+        (add-text-properties (nth 1 params)
+                             (nth 2 params)
                              `(syntax-table ,table))
         (setq-local parse-sexp-lookup-properties t))
     (setq-local parse-sexp-lookup-properties
-                org-src-syntax-table-lookup-properties-orig)))
+                org-src-syntax-table-properties-orig)))
+
+(defun org-src-syntax-table-pre-command ()
+  "Add syntax table to current src block according to their major mode.
+See `org-src-syntax-table-commands'"
+  (when (memq this-command org-src-syntax-table-commands)
+    (org-src-syntax-table-propertize-src-block)))
 
 (defun org-src-syntax-table-region-property-boundaries (prop &optional pos)
   "Return property boundaries for PROP at POS."
@@ -140,19 +153,26 @@ This function should be used added globally to a variable `org-font-lock-hook'."
         (when (null end) (setq end (point-min))))
       (cons beg end))))
 
+(defun org-src-syntax-table-show-paren ()
+  "Find the opener/closer near point and its match."
+  (org-src-syntax-table-propertize-src-block)
+  (let ((parse-sexp-lookup-properties t))
+    (when org-src-syntax-table-paren-function-orig
+      (funcall org-src-syntax-table-paren-function-orig))))
+
 ;;;###autoload
 (define-minor-mode org-src-syntax-table-mode
   "Propertize org src blocks with syntax tables from their major-mode."
   :lighter " stx-tbl"
   :global nil
-  (if org-src-syntax-table-mode
-      (progn (setq org-src-syntax-table-lookup-properties-orig
-                   parse-sexp-lookup-properties)
-             (add-hook 'pre-command-hook
-                       'org-src-syntax-table-pre-command-hook nil t))
-    (remove-hook 'pre-command-hook 'org-src-syntax-table-pre-command-hook t)
-    (setq-local parse-sexp-lookup-properties
-                org-src-syntax-table-lookup-properties-orig)))
+  (cond
+   ((not org-src-syntax-table-mode)
+    (remove-hook 'pre-command-hook #'org-src-syntax-table-pre-command t)
+    (setq parse-sexp-lookup-properties org-src-syntax-table-properties-orig
+          show-paren-data-function org-src-syntax-table-paren-function-orig))
+   (t (setq org-src-syntax-table-properties-orig parse-sexp-lookup-properties
+            org-src-syntax-table-paren-function-orig show-paren-data-function)
+      (add-hook 'pre-command-hook #'org-src-syntax-table-pre-command nil t))))
 
 (provide 'org-src-syntax-table)
 ;;; org-src-syntax-table.el ends here
