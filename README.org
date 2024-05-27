@@ -1,6 +1,6 @@
 * org-src-syntax-table
 
-Add syntax tables to org src blocks according to their major mode.
+Add syntax tables to source blocks in Org mode according to their major mode.
 
 ** Installation
 

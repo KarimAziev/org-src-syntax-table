@@ -1,4 +1,4 @@
-;;; org-src-syntax-table.el --- Configure org src -*- lexical-binding: t -*-
+;;; org-src-syntax-table.el --- Add syntax tables to source blocks in Org mode -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2022 Karim Aziiev <karim.aziiev@gmail.com>
 
@@ -24,7 +24,7 @@
 ;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ;;; Commentary:
 
-;; Add syntax table to org src blocks according to their major mode
+;; Add syntax tables to source blocks in Org mode according to their major mode.
 
 ;; Usage:
 ;; (require 'org-src-syntax-table)
